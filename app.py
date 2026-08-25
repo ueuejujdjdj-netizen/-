@@ -1,5 +1,6 @@
 import streamlit as st
 import datetime
+import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 
 # إعدادات الصفحة
@@ -7,20 +8,23 @@ st.set_page_config(page_title="جدول إحضار الطعام", page_icon="�
 
 # 1. قائمة الطلاب الـ 11
 STUDENTS = [
-    "كرار رعد", "زين العابدين", "حيدر محمد", "مصطفى كمر", "سجاد مهند",
-    "مصطفى محمد5", "مصطفى عيسى", "علي غزوان", "مقتدى", "حيدر جاسم", "مصطفى حسين" # (تأكد من إكمال الاسم الـ 11 إذا كان ناقصاً)
+    "كرار رعد", "زين العابدين", "حيدر محمد", "مصطفى كمر", "مهند سجاد",
+    "مصطفى محمد", "مصطفى عيسى", "علي غزوان", "مقتدى", "حيدر جاسم", "مصطفى حسين"
 ]
 
-# 2. الربط بجدول جوجل (استبدل النص أدناه برابط جدولك)
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1ZxsRrPAKX8K4HSbAT1A3Z_K52QUU6vS0TNLZFpC2Jak/edit?pli=1&gid=0#gid=0" 
+# 2. الربط بجدول جوجل
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1ZxsRrPAKX8K4HSbAT1A3Z-w5yQ/edit" 
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_data():
     try:
-        return conn.read(spreadsheet=SPREADSHEET_URL, ttl="0")
-    except:
-        import pandas as pd
+        data = conn.read(spreadsheet=SPREADSHEET_URL, ttl=0)
+        # التأكد من وجود الأعمدة المطلوبة
+        if "Student" not in data.columns or "Meal" not in data.columns:
+            return pd.DataFrame(columns=["Student", "Meal"])
+        return data
+    except Exception:
         return pd.DataFrame(columns=["Student", "Meal"])
 
 df = load_data()
@@ -51,22 +55,31 @@ for student in this_week_students:
     
     # جلب الأكلة الحالية المثبتة في الجدول إن وجدت
     existing_meal = ""
-    if not df.empty and student in df["Student"].values:
-        existing_meal = df.loc[df["Student"] == student, "Meal"].values[0]
+    if not df.empty and "Student" in df.columns and student in df["Student"].values:
+        meal_val = df.loc[df["Student"] == student, "Meal"].values
+        if len(meal_val) > 0 and pd.notna(meal_val[0]):
+            existing_meal = str(meal_val[0])
 
     with col1:
         st.write(f"👤 {student}")
     with col2:
-        new_meal = st.text_input(f"نوع الوجبة", value=existing_meal, key=f"input_{student}", label_visibility="collapsed", placeholder="مثلاً: دجاج، فطائر...")
+        new_meal = st.text_input(
+            f"نوع الوجبة", 
+            value=existing_meal, 
+            key=f"input_{student}", 
+            label_visibility="collapsed", 
+            placeholder="مثلاً: دجاج، فطائر..."
+        )
     with col3:
         if st.button("حفظ", key=f"btn_{student}"):
-            # تحديث البيانات في الداتا فريم ثم كتابتها في جوجل شيت
-            if student in df["Student"].values:
-                df.loc[df["Student"] == student, "Meal"] = new_meal
+            if df.empty or "Student" not in df.columns:
+                df = pd.DataFrame([{"Student": student, "Meal": new_meal}])
             else:
-                import pandas as pd
-                new_row = pd.DataFrame([{"Student": student, "Meal": new_meal}])
-                df = pd.concat([df, new_row], ignore_index=True)
+                if student in df["Student"].values:
+                    df.loc[df["Student"] == student, "Meal"] = new_meal
+                else:
+                    new_row = pd.DataFrame([{"Student": student, "Meal": new_meal}])
+                    df = pd.concat([df, new_row], ignore_index=True)
             
             conn.update(spreadsheet=SPREADSHEET_URL, data=df)
             st.success("تم الحفظ!")
