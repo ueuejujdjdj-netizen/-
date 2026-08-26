@@ -1,26 +1,28 @@
 import streamlit as st
 import datetime
 import pandas as pd
-from streamlit_gsheets import GSheetsConnection
 
 # إعدادات الصفحة
 st.set_page_config(page_title="جدول إحضار الطعام", page_icon="🍔", layout="centered")
 
 # 1. قائمة الطلاب الـ 11
 STUDENTS = [
-    "كرار رعد", "زين العابدين", "حيدر محمد", "مصطفى كمر", "سجاد مهند",
+    "كرار رعد", "زين العابدين", "حيدر محمد", "مصطفى كمر", "مهند سجاد",
     "مصطفى محمد", "مصطفى عيسى", "علي غزوان", "مقتدى", "حيدر جاسم", "مصطفى حسين"
 ]
 
-# 2. الاتصال بـ Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
+# 2. رابط قراءة جدول جوجل مباشرة كـ CSV
+SHEET_ID = "1ZxsRrPAKX8K4HSbAT1A3Z-w5yQ"
+CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
 
+# ضع رابط نموذج جوجل الخاص بك هنا إذا أنشأت واحداً، أو اترك رابط الجدول المباشر
+FORM_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit"
+
+@st.cache_data(ttl=2)
 def load_data():
     try:
-        data = conn.read(ttl=0)
+        data = pd.read_csv(CSV_URL)
         data.columns = [str(col).strip() for col in data.columns]
-        if "Student" not in data.columns or "Meal" not in data.columns:
-            return pd.DataFrame(columns=["Student", "Meal"])
         return data
     except Exception:
         return pd.DataFrame(columns=["Student", "Meal"])
@@ -47,42 +49,30 @@ st.subheader(f"📅 المكلفون برفع الأكل - الأسبوع الح
 
 this_week_students = get_duty_students(0)
 
-# عرض خانات الكتابة والحفظ لكل طالب
+# عرض الوجبات فقط بأسلوب أنيق وبدون أخطاء كتابة
 for student in this_week_students:
-    col1, col2, col3 = st.columns([2, 3, 1])
+    col1, col2 = st.columns([2, 3])
     
-    existing_meal = ""
+    existing_meal = "لم تحدد بعد"
     if not df.empty and "Student" in df.columns:
         match = df[df["Student"].astype(str).str.strip() == student]
         if not match.empty:
-            meal_val = match["Meal"].values[0]
-            if pd.notna(meal_val):
+            meal_val = match["Meal"].values[-1] # جلب أحدث وجبة مدخلة
+            if pd.notna(meal_val) and str(meal_val).strip() != "":
                 existing_meal = str(meal_val)
 
     with col1:
         st.write(f"👤 {student}")
     with col2:
-        new_meal = st.text_input(
-            "نوع الوجبة", 
-            value=existing_meal, 
-            key=f"input_{student}", 
-            label_visibility="collapsed", 
-            placeholder="اكتب نوع الوجبة..."
-        )
-    with col3:
-        if st.button("حفظ", key=f"btn_{student}"):
-            if df.empty or "Student" not in df.columns:
-                df = pd.DataFrame([{"Student": student, "Meal": new_meal}])
-            else:
-                if student in df["Student"].astype(str).str.strip().values:
-                    df.loc[df["Student"].astype(str).str.strip() == student, "Meal"] = new_meal
-                else:
-                    new_row = pd.DataFrame([{"Student": student, "Meal": new_meal}])
-                    df = pd.concat([df, new_row], ignore_index=True)
-            
-            conn.update(data=df)
-            st.success("تم الحفظ!")
-            st.rerun()
+        if existing_meal == "لم تحدد بعد":
+            st.warning(f"🍲 الوجبة: {existing_meal}")
+        else:
+            st.success(f"🍲 الوجبة: {existing_meal}")
+
+st.divider()
+
+# زر يفتح الجدول لتعديل أو كتابة الوجبة مباشرة
+st.link_button("📝 اضغط هنا لكتابة أو تعديل وجبتك", FORM_URL, use_container_width=True)
 
 st.divider()
 st.subheader("🔮 القائمة المبدئية للأسبوع القادم")
