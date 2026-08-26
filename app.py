@@ -12,11 +12,11 @@ STUDENTS = [
 ]
 
 # 2. رابط قراءة جدول جوجل مباشرة كـ CSV
-SHEET_ID = "1ZxsRrPAKX8K4HSbAT1A3Z-w5yQ"
+SHEET_ID = "https://docs.google.com/spreadsheets/d/1-VvcuVNQUnb1U6pfoRTD9kvVoGOQNXeTGgST4gyiCjQ/edit?gid=0#gid=0"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
 
 # ضع رابط نموذج جوجل الخاص بك هنا إذا أنشأت واحداً، أو اترك رابط الجدول المباشر
-FORM_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit"
+FORM_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}https://docs.google.com/spreadsheets/d/1-VvcuVNQUnb1U6pfoRTD9kvVoGOQNXeTGgST4gyiCjQ/edit?gid=0#gid=0"
 
 @st.cache_data(ttl=2)
 def load_data():
