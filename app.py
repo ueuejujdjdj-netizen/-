@@ -1,6 +1,7 @@
 import streamlit as st
 import datetime
 import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 
 # إعدادات الصفحة
 st.set_page_config(page_title="جدول إحضار الطعام", page_icon="🍔", layout="centered")
@@ -11,16 +12,12 @@ STUDENTS = [
     "مصطفى محمد", "مصطفى عيسى", "علي غزوان", "مقتدى", "حيدر جاسم", "مصطفى حسين"
 ]
 
-# 2. رابط جوجل شيتس بصيغة CSV الشفافة
-# استبدل هذا المعرف ID بالمعرف الخاص بجدولك إذا تغير
-SHEET_ID = "1ZxsRrPAKX8K4HSbAT1A3Z-w5yQ"
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
+# 2. الاتصال بـ Google Sheets
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-@st.cache_data(ttl=5)
 def load_data():
     try:
-        data = pd.read_csv(CSV_URL)
-        # تصحيح المسافات وتنظيف الأعمدة
+        data = conn.read(ttl=0)
         data.columns = [str(col).strip() for col in data.columns]
         if "Student" not in data.columns or "Meal" not in data.columns:
             return pd.DataFrame(columns=["Student", "Meal"])
@@ -50,29 +47,42 @@ st.subheader(f"📅 المكلفون برفع الأكل - الأسبوع الح
 
 this_week_students = get_duty_students(0)
 
-# عرض الوجبات والمدخلات
+# عرض خانات الكتابة والحفظ لكل طالب
 for student in this_week_students:
-    col1, col2 = st.columns([2, 3])
+    col1, col2, col3 = st.columns([2, 3, 1])
     
-    # جلب الأكلة الحالية من جدول جوجل
-    existing_meal = "لم تحدد بعد"
+    existing_meal = ""
     if not df.empty and "Student" in df.columns:
         match = df[df["Student"].astype(str).str.strip() == student]
         if not match.empty:
             meal_val = match["Meal"].values[0]
-            if pd.notna(meal_val) and str(meal_val).strip() != "":
+            if pd.notna(meal_val):
                 existing_meal = str(meal_val)
 
     with col1:
         st.write(f"👤 {student}")
     with col2:
-        st.info(f"🍲 الوجبة: {existing_meal}")
-
-st.divider()
-st.warning("💡 لتغيير نوع الوجبة أو إضافتها: افتح جدول جوجل شيتس مباشرة واكتب الوجبة أمام اسمك، وستظهر هنا أوتوماتيكياً للجميع!")
-
-# رابط مباشر للجدول لسهولة التعديل
-st.link_button("📂 فتح جدول جوجل لتحديث الوجبات", f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit")
+        new_meal = st.text_input(
+            "نوع الوجبة", 
+            value=existing_meal, 
+            key=f"input_{student}", 
+            label_visibility="collapsed", 
+            placeholder="اكتب نوع الوجبة..."
+        )
+    with col3:
+        if st.button("حفظ", key=f"btn_{student}"):
+            if df.empty or "Student" not in df.columns:
+                df = pd.DataFrame([{"Student": student, "Meal": new_meal}])
+            else:
+                if student in df["Student"].astype(str).str.strip().values:
+                    df.loc[df["Student"].astype(str).str.strip() == student, "Meal"] = new_meal
+                else:
+                    new_row = pd.DataFrame([{"Student": student, "Meal": new_meal}])
+                    df = pd.concat([df, new_row], ignore_index=True)
+            
+            conn.update(data=df)
+            st.success("تم الحفظ!")
+            st.rerun()
 
 st.divider()
 st.subheader("🔮 القائمة المبدئية للأسبوع القادم")
